@@ -1,0 +1,777 @@
+---
+title: "PIE-3P analyses"
+author: "Amanda Mae Woodward"
+date: "2/26/2020"
+output: html_document
+---
+```{r}
+library(lmerTest)
+library(expss)
+library(Rmisc)
+library(plyr)
+library(dplyr)
+library(car)
+library(doBy)
+library(tidyverse)
+library(ggplot2)
+library(lme4)
+library(RColorBrewer)
+
+```
+
+```{r}
+dat<- read.csv("~/Desktop/PIE-3P Analyses/PIE3P-dataclean.csv")
+```
+
+#Overall Analysis
+##Question: Do children detect social exclusion more after the exclusion game than the inclusion game? 
+Note: I used the **first** detection for this analysis because it was the one not influenced by the experimenter's feedback. 
+
+```{r}
+summary(dat$Exclusion_D1[dat$Inclusion_D1=="play"]) #This summary gives us the children who answered the inclusion question correctly and the exclusion question incorrectly and correctly
+summary(dat$Exclusion_D1[dat$Inclusion_D1=="watch"])# This summary gives us the children who answered the inclusion questionin correctly and the exclusion question incorrectly and correctly 
+
+ExclusionTotal<- c(4,61)
+InclusionTotal<- c(0,4)
+detectMatrix<-as.matrix(rbind(ExclusionTotal,InclusionTotal))
+detectMatrix
+mcnemar.test(detectMatrix)
+```
+**Interpretation:** Overall, children detect social exclusion when it is present, more often than when it is not 
+
+###By Age Group (pre-registration)
+```{r, include=FALSE}
+Younger<-subset(dat, dat$ageGroup==3 |dat$ageGroup==4)
+Older<-subset(dat, dat$ageGroup==5 | dat$ageGroup==6)
+```
+####Younger
+```{r}
+summary(Younger$Exclusion_D1[Younger$Inclusion_D1=="play"])
+summary(Younger$Exclusion_D1[Younger$Inclusion_D1=="watch"])
+youngerInclusion<-c(3,29)
+youngerExclusion<-c(0,3)
+youngerMatrix<- as.matrix(rbind(youngerInclusion,youngerExclusion))
+mcnemar.test(youngerMatrix)
+```
+**Interpretation:** Younger children detect exclusion when it is present more than when it is not present
+####Older
+```{r}
+summary(Older$Exclusion_D1[Older$Inclusion_D1=="play"])
+summary(Older$Exclusion_D1[Older$Inclusion_D1=="watch"])
+olderExclusion<- c(1,32)
+olderInclusion<- c(0,1)
+olderMatrix<-as.matrix(rbind(olderExclusion, olderInclusion))
+mcnemar.test(olderMatrix)
+```
+**Interpretation:** Older children detect exclusion when it is present more than when it is not present
+
+##Overall, do Children evaluate includers as nicer than excluders? 
+```{r}
+wilcox.test(dat$ExclusionNiceScale,dat$InclusionNiceScale, paired=TRUE)
+meanStd<- function(col){
+  print(c(mean(col), sd(col)))
+}
+meanStd(dat$ExclusionNiceScale)
+meanStd(dat$InclusionNiceScale)
+```
+**Interpretation:** Children rate includers as nicer than excluders
+
+###By Age Group
+
+####Younger
+```{r}
+wilcox.test(Younger$ExclusionNiceScale, Younger$InclusionNiceScale, paired = TRUE, alternative = "less")
+meanStd(Younger$ExclusionNiceScale)
+meanStd(Younger$InclusionNiceScale)
+```
+**Interpretation:** Overall, younger children indicate that includers are nicer than excluders 
+
+####Older Age Group
+```{r}
+wilcox.test(Older$ExclusionNiceScale, Older$InclusionNiceScale, paired=TRUE)
+meanStd(Older$ExclusionNiceScale)
+meanStd(Older$InclusionNiceScale)
+```
+**Interpretation:** Older children rated the includer as nicer than the excluder
+
+##Overall, do children prefer to play with the inclusive puppet over the exclusive puppet?
+```{r}
+cro(dat$playQ)
+binom.test(49,69)
+```
+**Interpretation:** Overall, children prefer to play with the includer over the excluder
+
+###By age group
+
+####Younger
+```{r}
+cro(Younger$playQ)
+binom.test(19,35, alternative="greater")
+```
+**Interpretation:** Younger children do not have a preference for the includer over the excluder
+
+####Older
+```{r}
+cro(Older$playQ)
+binom.test(30,34)
+```
+**Interpretation:** Children preferred to play with the including puppet over the excluding puppet 
+
+##Overall, do children answer the memory check question correctly?
+```{r}
+cro(dat$memCheck)
+binom.test(67,69)
+```
+**Interpretation:** Children identified the inclusive puppet more often than chance
+
+###By age group
+####Younger
+```{r}
+cro(Younger$memCheck)
+binom.test(33,35)
+```
+**Interpretation:** Younger children identified the inclusive puppet more than chance. 
+
+####Older
+```{r}
+cro(Older$memCheck)
+binom.test(34,34)
+```
+**Interpretation:** older children identified the inclusive puppet more than chance
+
+##Does age predict whether children will detect social exclusion across game types?
+
+```{r}
+datSub<-cbind.data.frame(dat[,2:5],dat[,9:11], dat[,14],dat[,18])
+colnames(datSub)[8:9]<-c("Exclusion_D1","Inclusion_D1")
+detectLong<-pivot_longer(datSub,col= c("Exclusion_D1", "Inclusion_D1"), names_to = "Game", values_to= "Response") 
+detectLong$Response<- as.factor(detectLong$Response)
+levels(detectLong$Response)<- c(0, 1)
+detectLong$Response<- as.numeric(levels(detectLong$Response))[detectLong$Response]
+detectLong$Game<-as.factor(detectLong$Game)
+detectLong$subj<-as.factor(detectLong$subj)
+detectLong$order<-as.factor(detectLong$order)
+detectLong$ecolor<- as.factor(detectLong$ecolor)
+detectLong$eside<-as.factor(detectLong$eside)
+detectLong$sex<-as.factor(detectLong$sex) 
+detectLong$ageGroup<-as.factor(detectLong$ageGroup)
+```
+###Preliminary Model(s)
+```{r}
+detectLong$ageScale<-scale(detectLong$ageMonths)
+
+glm1<- glmer(Response~ Game+ageScale+sex+ecolor+eside+order+(1|subj), data=detectLong, family=binomial,control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+summary(glm1)
+```
+**Interpretation:** Model failed to converge. No counterbalancing factors significantly predicted children's choices. 
+
+###Main Model
+```{r}
+glm2<- glmer(Response~ ageScale*Game+(1|subj), data=detectLong, family=binomial(link = "logit"),control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+summary(glm2)
+
+```
+**Interpretation:** Age did not significantly predict whether children detected social exclusion. Game was the only significant predictor. 
+
+#####Notes on this section:
+```{r}
+ageDect<-summarySEwithin(data=detectLong, measurevar= "Response", betweenvars="ageGroup", withinvars="Game", idvar="subj", conf.interval=0.95)
+levels(ageDect$Game)<- c("Exclusion", "Inclusion")
+"note: not using this version b/c can't place space the way i want to"
+levels(ageDect$ageGroup)<-c(" 3 \nyears", " 4 \nyears"," 5 \nyears", " 6 \nyears")
+
+ggsave("PIE3P-ExclusionDetection2.tiff", units="in", width=10, height=8, dpi=300)
+ggplot(detectLong, aes(ageMonths,Response,group=Game) )+geom_point(aes(fill=Game),size=4,pch=21,color="black") +theme_classic()+geom_smooth(method="lm",aes(color=Game), size=1.5)+scale_fill_manual(values=c("#045a8d", "#74a9cf"))+scale_color_manual(values=c("#045a8d", "#74a9cf")) +theme(legend.title=element_blank()) + xlab("Age (in months)")+ ylab("Children's Detection of Social Exclusion") + theme(plot.title=element_text(family="Times New Roman", face="bold", size=20))+ theme(text = element_text(size=20, family ="Times New Roman", face="bold"))
+dev.off()
+```
+
+##Does age predict children's niceness ratings? 
+```{r }
+datSub<-cbind.data.frame(dat[,2:5],dat[,9:11], dat[,21],dat[,25])
+colnames(datSub)[8:9]<-c("ExclusionNice","InclusionNice")
+niceLong<-pivot_longer(datSub,col= c("ExclusionNice", "InclusionNice"), names_to = "Game", values_to = "Nice") 
+
+```
+###Preliminary Model(s)
+```{r}
+glm1N<- lmerTest::lmer(Nice~ Game+ageMonths+sex+ecolor+eside+order+(1|subj), data=niceLong)
+summary(glm1N)
+```
+**Interpretation:**  No counterbalancing factors significantly predicted children's choices.Character evaluated significantly predicted children's niceness ratings.
+
+###Main Model
+```{r}
+glm2N<- lmerTest::lmer(Nice~ Game*ageMonths+(1|subj), data=niceLong)
+summary(glm2N)
+```
+**Interpretation:** Game significantly predicted children's niceness ratings. Game and age interacted to predict children's niceness ratings. Older children rated includers as nicer. 
+
+#simple slope on Nice
+```{r}
+E<-subset(niceLong, niceLong$Game=="ExclusionNice")
+I<- subset(niceLong, niceLong$Game=="InclusionNice")
+
+glm2NE<- lm(Nice~ ageMonths, data=E)
+summary(glm2NE)
+glm2NI<- lm(Nice~ ageMonths, data=I)
+summary(glm2NI)
+```
+
+```{r}
+levels(niceLong$Game)<- c("Excluding Character", "Including Character")
+ggsave("PIE3P-Nicenessratings2020-11-02.tiff", units="in", width=10, height=8, dpi=300)
+ggplot(niceLong, aes(ageMonths,Nice,group=Game))+geom_point(aes(fill=Game),size=4,pch=21,color="black") +theme_classic()+geom_smooth(method="lm",aes(color=Game), size=1.5, alpha=.45)+scale_fill_manual(values=c("#000000","#FFFFFF"))+scale_color_manual(values=c("#000000","#FFFFFF")) +theme(legend.title=element_blank(),axis.ticks = element_line(colour = "black", size = 1)) + xlab(" ")+ ylab(" ")+theme(legend.position= "none",plot.title=element_text(family="Arial", face="bold", size=20))+ theme(text = element_text(size=20, family ="Arial", face="bold"))+scale_y_continuous(breaks=seq(1,6,1))
+dev.off()
+
+ggsave("PIE3P-Nicenessratings2021-02-09b.tiff", units="in", width=10, height=8, dpi=300)
+ggplot(niceLong, aes(ageMonths,Nice,group=Game))+geom_point(aes(fill=Game),size=4,pch=21,color="black", position=position_jitter(width=.1, height=.1)) +theme_classic()+geom_smooth(method="lm",aes(color=Game), size=1.5, alpha=.45)+scale_fill_manual(values=c("#000000","#FFFFFF"))+scale_color_manual(values=c("#000000","#FFFFFF")) +theme(legend.title=element_blank(),axis.ticks = element_line(colour = "black", size = 1)) + xlab(" ")+ ylab(" ")+theme(legend.position= "none",plot.title=element_text(family="Arial", face="bold", size=20))+ theme(text = element_text(size=20, family ="Arial", face="bold"))+scale_y_continuous(breaks=seq(1,6,1)) 
+dev.off()
+```
+**Interpretation of interaction:** Children's' niceness ratings of inclusive players stays relatively stable across age, but children rate the exclusive puppet more negatively across age. 
+
+####Follow up analyses
+```{r}
+wilcox.test(dat$ExclusionNiceScale[dat$ageGroup==3], dat$InclusionNiceScale[dat$ageGroup==3], paired=TRUE)
+```
+```{r}
+wilcox.test(dat$ExclusionNiceScale[dat$ageGroup==4], dat$InclusionNiceScale[dat$ageGroup==4], paired=TRUE)
+```
+```{r}
+wilcox.test(dat$ExclusionNiceScale[dat$ageGroup==5], dat$InclusionNiceScale[dat$ageGroup==5], paired=TRUE)
+```
+```{r}
+wilcox.test(dat$ExclusionNiceScale[dat$ageGroup==6], dat$InclusionNiceScale[dat$ageGroup==6], paired=TRUE)
+```
+
+##Does age predict children's play choices? 
+###Preliminary Model(s)
+```{r}
+dat$playQ<- as.factor(dat$playQ)
+levels(dat$playQ)<-c(0,1)
+dat$playQ2<- as.numeric(levels(dat$playQ))[dat$playQ]
+
+glm1P<- glm(playQ~ ageMonths+sex+ecolor+eside+order, data=dat, family=binomial)
+summary(glm1P)
+
+lm1P<- glm(playQ~ ageMonths*ecolor, data=dat, family=binomial)
+summary(glm1P)
+```
+**Interpretation:** Age in months and color of the excluder predicted children's play choices
+
+```{r}
+cro(dat$playQ,dat$ecolor)
+binom.test(14,20,alternative="greater")
+```
+Note: children were more likely to play with the excluder when they wore a blue shirt. 
+
+###Main Model
+```{r}
+glm2P<- glm(playQ~ ageMonths, data=dat, family=binomial)
+summary(glm2P)
+```
+**Interpretation:** Age predicted children's play choices. Older children were more likely to play with the includer than the excluder
+```{r}
+agePlay<-summarySE(data=dat, measurevar= "playQ2", groupvars="ageGroup",  conf.interval=0.95)
+agePlay$ageGroup<-as.factor(agePlay$ageGroup)
+levels(agePlay$ageGroup)<-c(" 3 \nyears", " 4 \nyears", " 5 \nyears", " 6 \nyears")
+
+ggsave("PIE3P-PlayChoice2021-02-09.tiff", units="in", width=10, height=8, dpi=300)
+ggplot(dat, aes(x=ageMonths, y=playQ2))+geom_point(size=4,aes(fill=playQ),pch=21,color="black", position=position_jitter(width=.02, height=.02))+stat_smooth(method="glm", method.args=list(family="binomial"), color="black", alpha=.45)+theme_classic()+scale_fill_manual(values=c("#000000","#FFFFFF"))+theme(legend.title=element_blank()) + xlab("")+  ylab("")+theme(legend.position="none",plot.title=element_text(family="Arial", face="bold", size=20))+ theme(text = element_text(size=20, family ="Arial", face="bold"),axis.ticks = element_line(colour = "black", size = 1))+theme(legend.position = "none")+scale_y_continuous(breaks=seq(0,1,1))
+dev.off()
+```
+
+####follow up analyses
+```{r}
+cro(dat$playQ, dat$ageGroup)
+binom.test(7,16)
+binom.test(12,19)
+binom.test(15,17)
+binom.test(15,17)
+```
+
+##Does age predict children's memory check responses? 
+###Preliminary Model(s)
+```{r}
+dat$memCheck<-as.factor(dat$memCheck)
+levels(dat$memCheck)<-c(0,1)
+dat$memCheck<-as.numeric(levels(dat$memCheck))[dat$memCheck]
+dat$order<-as.factor(dat$order)
+dat$eside<-as.factor(dat$eside)
+dat$ecolor<- as.factor(dat$ecolor)
+dat$sex<- as.factor(dat$sex)
+glm1M<- glm(memCheck~ ageMonths+sex+ecolor+eside+order, data=dat, family=binomial)
+summary(glm1M)
+```
+**Interpretation:** model did not converge (so few children answered the memory check incorrectly that can't really anyalyze)
+
+###Main Model
+```{r}
+glm2P<- glm(memCheck~ ageMonths, data=dat, family=binomial)
+summary(glm2P)
+```
+**Interpretation:** Age did not predict children's memory check responses
+```{r}
+ageMem<-summarySE(data=dat, measurevar= "memCheck", groupvars="ageGroup",  conf.interval=0.95)
+ageMem$ageGroup<-as.factor(ageMem$ageGroup)
+levels(ageMem$ageGroup)<-c(" 3 \nyears", " 4 \nyears", " 5 \nyears", " 6 \nyears")
+ggsave("PIE3P-MemCheck.tiff", units="in", width=10, height=8, dpi=300)
+ageMem$ageGroup2<- as.character(ageMem$ageGroup)
+ggplot(ageMem,aes(ageGroup2,memCheck))+geom_bar(stat="identity",position=position_dodge2(width= 1, preserve=c( "single"),padding = 2), color="black", fill="#D6D6D6")+scale_y_continuous(breaks=seq(0,1,.25))+ theme_classic()+geom_errorbar(size=1, width=.1,position=position_dodge(1), aes(ymin=memCheck-ci, ymax=memCheck+ci))+ geom_hline(yintercept=.5,color="red",linetype="dashed",size=1.5)+xlab("")+ ylab("Proportion Answering Accurately")+theme(plot.title=element_text(family="Arial", face="bold", size=20))+ theme(text = element_text(size=20, family ="Arial", face="bold"),axis.ticks = element_line(colour = "black", size = 1))+theme(legend.position = "none")
+dev.off()
+```
+
+##Exploratory Analyses
+What reason do children give for their play choice? 
+```{r}
+cro(dat$playAvoid)
+binom.test(56,69)
+```
+**Interpretation:** children overwhelmingly choose a play mate because they think they will play with them (e.g. play not avoid)
+
+By age
+###younger
+```{r}
+cro(Younger$playAvoid)
+binom.test(28,35)
+```
+
+###older
+```{r}
+cro(Older$playAvoid)
+binom.test(28,34)
+```
+```{r}
+cro(dat$playAvoid)
+d1<- subset(dat, dat$playAvoid!="both")
+glm2Pp<- glm(playAvoid~ageMonths+sex+ecolor+eside+order, data=d1, family=binomial)
+summary(glm2Pp)
+glm2Pp<- glm(playAvoid~ageMonths, data=d1, family=binomial)
+
+```
+**Interpretation:** both older and younger children are choosing to play with the person because they think they are more likely to play with them
+
+is there a difference between play choice and reasoning? 
+```{r}
+summary(dat$playAvoid[dat$playQ==1])
+summary(dat$playAvoid[dat$playQ==0])
+incl<- c(41, 8)
+excl<- c(15,4)
+d<-as.matrix(rbind.data.frame(incl,excl))
+mcnemar.test(d)
+```
+no difference in reasoning based on play choice
+
+#Exploring difference in Evaluation scores
+```{r}
+dat$diff<-dat$InclusionNiceScale-dat$ExclusionNiceScale
+dat$playQ<-as.numeric(levels(dat$playQ)[dat$playQ])
+Anova(glm(playQ~diff*ageMonths,data=dat, family="binomial"))
+```
+**Note:** Age significantly predicted children's play preferences, but evaluations and their interaction did not. 
+
+##Play Explanation Exploration
+```{r}
+datPlay<-read.csv("~/Desktop/PIE3P-PlayExplanations.csv",na.strings="0")
+datPlayFinal<-subset(datPlay, datPlay$FinalData=="Y")
+colnames(datPlay)[1:4]<-c("subj", "FinalData", "ageGroup", "sex")
+datPlay$ageGroup<-as.factor(datPlay$ageGroup)
+datPlayFinal$OlderYounger <- as.factor(ifelse(datPlayFinal$Age.Group==3 | datPlayFinal$Age.Group==4, "younger", "older"))
+```
+
+```{r}
+cro(datPlayFinal$PlayChoice, datPlayFinal$Pos.Char)
+cro(datPlayFinal$PlayChoice, datPlayFinal$Pos.Char, datPlayFinal$Age.Group)
+cro(datPlayFinal$PlayChoice, datPlayFinal$Pos.Char, datPlayFinal$OlderYounger)
+
+cro(datPlayFinal$PlayChoice, datPlayFinal$Neg.Char)
+cro(datPlayFinal$PlayChoice, datPlayFinal$Neg.Char, datPlayFinal$Age.Group)
+cro(datPlayFinal$PlayChoice, datPlayFinal$Neg.Char, datPlayFinal$OlderYounger)
+
+cro(datPlayFinal$PlayChoice, datPlayFinal$Pos.Feeling)
+cro(datPlayFinal$PlayChoice, datPlayFinal$Pos.Feeling, datPlayFinal$Age.Group)
+cro(datPlayFinal$PlayChoice, datPlayFinal$Pos.Feeling, datPlayFinal$OlderYounger)
+
+cro(datPlayFinal$PlayChoice, datPlayFinal$Neg.Feeling)
+cro(datPlayFinal$PlayChoice, datPlayFinal$Neg.Feeling, datPlayFinal$Age.Group)
+cro(datPlayFinal$PlayChoice, datPlayFinal$Neg.Feeling, datPlayFinal$OlderYounger)
+
+cro(datPlayFinal$PlayChoice, datPlayFinal$Inclusion)
+cro(datPlayFinal$PlayChoice, datPlayFinal$Inclusion, datPlayFinal$Age.Group)
+cro(datPlayFinal$PlayChoice, datPlayFinal$Inclusion, datPlayFinal$OlderYounger)
+
+cro(datPlayFinal$PlayChoice, datPlayFinal$Exclusion)
+cro(datPlayFinal$PlayChoice, datPlayFinal$Exclusion, datPlayFinal$Age.Group)
+cro(datPlayFinal$PlayChoice, datPlayFinal$Exclusion, datPlayFinal$OlderYounger)
+
+cro(datPlayFinal$PlayChoice, datPlayFinal$Comparison)
+cro(datPlayFinal$PlayChoice, datPlayFinal$Comparison, datPlayFinal$Age.Group)
+cro(datPlayFinal$PlayChoice, datPlayFinal$Comparison, datPlayFinal$OlderYounger)
+
+cro(datPlayFinal$PlayChoice, datPlayFinal$MoralTerms)
+cro(datPlayFinal$PlayChoice, datPlayFinal$MoralTerms, datPlayFinal$Age.Group)
+cro(datPlayFinal$PlayChoice, datPlayFinal$MoralTerms, datPlayFinal$OlderYounger)
+
+cro(datPlayFinal$PlayChoice, datPlayFinal$FutureTreatment)
+cro(datPlayFinal$PlayChoice, datPlayFinal$FutureTreatment, datPlayFinal$Age.Group)
+cro(datPlayFinal$PlayChoice, datPlayFinal$FutureTreatment, datPlayFinal$OlderYounger)
+
+cro(datPlayFinal$PlayChoice, datPlayFinal$Allow)
+cro(datPlayFinal$PlayChoice, datPlayFinal$Allow, datPlayFinal$Age.Group)
+cro(datPlayFinal$PlayChoice, datPlayFinal$Allow, datPlayFinal$OlderYounger)
+
+cro(datPlayFinal$PlayChoice, datPlayFinal$Other)
+cro(datPlayFinal$PlayChoice, datPlayFinal$Other, datPlayFinal$Age.Group)
+cro(datPlayFinal$PlayChoice, datPlayFinal$Other, datPlayFinal$OlderYounger)
+
+cro(datPlayFinal$PlayChoice, datPlayFinal$RestatePlayChoice)
+cro(datPlayFinal$PlayChoice, datPlayFinal$RestatePlayChoice, datPlayFinal$Age.Group)
+cro(datPlayFinal$PlayChoice, datPlayFinal$RestatePlayChoice, datPlayFinal$OlderYounger)
+
+cro(datPlayFinal$PlayChoice, datPlayFinal$NoExplanation)
+cro(datPlayFinal$PlayChoice, datPlayFinal$NoExplanation, datPlayFinal$Age.Group)
+cro(datPlayFinal$PlayChoice, datPlayFinal$NoExplanation, datPlayFinal$OlderYounger)
+```
+
+"Creating Groups"
+```{r}
+datPlayFinal$feelings<-NA
+for (i in 1:length(datPlayFinal$Subject..)){
+datPlayFinal$feelings[i]<- sum(datPlayFinal$Pos.Feeling[i], datPlayFinal$Neg.Feeling[i], na.rm=TRUE)
+}
+datPlayFinal$characteristics<- NA
+for (i in 1:length(datPlayFinal$Subject..)){
+datPlayFinal$characteristics[i]<- sum(datPlayFinal$Pos.Char[i],datPlayFinal$Neg.Char[i], na.rm=TRUE)
+}
+datPlayFinal$gamePlay<- NA
+for (i in 1:length(datPlayFinal$Subject..)){
+datPlayFinal$gamePlay[i]<- sum(datPlayFinal$Inclusion[i],datPlayFinal$Exclusion[i], na.rm=TRUE)
+}
+datPlayFinal$abstractConcepts<-NA
+for (i in 1:length(datPlayFinal$Subject..)){
+datPlayFinal$abstractConcepts[i]<- sum(datPlayFinal$MoralTerms[i],datPlayFinal$FutureTreatment[i], datPlayFinal$Allow[i], na.rm=TRUE)
+}
+
+datPlayFinal$decisionMaking<- datPlayFinal$Comparison
+```
+
+```{r}
+cro(datPlayFinal$PlayChoice, datPlayFinal$characteristics)
+cro(datPlayFinal$PlayChoice,datPlayFinal$characteristics,datPlayFinal$OlderYounger)
+cro(datPlayFinal$PlayChoice,datPlayFinal$characteristics,datPlayFinal$Age.Group)
+
+cro(datPlayFinal$PlayChoice, datPlayFinal$feelings)
+cro(datPlayFinal$PlayChoice,datPlayFinal$feelings,datPlayFinal$OlderYounger)
+cro(datPlayFinal$PlayChoice,datPlayFinal$feelings,datPlayFinal$Age.Group)
+
+cro(datPlayFinal$PlayChoice, datPlayFinal$gamePlay)
+cro(datPlayFinal$PlayChoice,datPlayFinal$gamePlay,datPlayFinal$OlderYounger)
+cro(datPlayFinal$PlayChoice,datPlayFinal$gamePlay,datPlayFinal$Age.Group)
+
+cro(datPlayFinal$PlayChoice, datPlayFinal$abstractConcepts)
+cro(datPlayFinal$PlayChoice,datPlayFinal$abstractConcepts,datPlayFinal$OlderYounger)
+cro(datPlayFinal$PlayChoice,datPlayFinal$abstractConcepts,datPlayFinal$Age.Group)
+
+cro(datPlayFinal$PlayChoice, datPlayFinal$decisionMaking)
+cro(datPlayFinal$PlayChoice,datPlayFinal$decisionMaking,datPlayFinal$OlderYounger)
+cro(datPlayFinal$PlayChoice,datPlayFinal$decisionMaking,datPlayFinal$Age.Group)
+```
+
+###Exploratory Fisher Tests on Categories
+"Characteristics" 
+```{r}
+olderChar<- c(17,17)
+youngerChar<- c(10,25)
+ageChar<- as.matrix(rbind(olderChar, youngerChar))
+fisher.test(ageChar)
+```
+```{r}
+includerChar<- c(14,35)
+excluderChar<- c(3,17)
+playChar<- as.matrix(rbind(includerChar, excluderChar))
+fisher.test(playChar)
+```
+
+"feelings" 
+```{r}
+olderFeel<- c(0, 34)
+youngerFeel<-c(9,26)
+ageFeel<- as.matrix(rbind(olderFeel, youngerFeel))
+fisher.test(ageFeel)
+```
+```{r}
+includerFeel<- c(5, 44)
+excluderFeel<-c(4,16)
+playFeel<- as.matrix(rbind(includerFeel, excluderFeel))
+fisher.test(playFeel)
+```
+
+
+"Game Play"
+```{r}
+olderGame<-c(11,23)
+youngerGame<-c(6,29)
+ageGame<-as.matrix(rbind(olderGame, youngerGame))
+fisher.test(ageGame)
+```
+
+```{r}
+includerGame<- c(14,35)
+excluderGame<- c(3,17)
+playGame<- as.matrix(rbind(includerGame, excluderGame))
+fisher.test(playGame)
+```
+
+"Decision Making"
+```{r}
+olderDecision<- c(11,23)
+youngerDecision<- c(2,33)
+ageDecide<- as.matrix(rbind(olderDecision, youngerDecision))
+fisher.test(ageDecide)
+
+```
+```{r}
+includeDecision<- c(12,37)
+excludeDecision<- c(1,19)
+playDecide<- as.matrix(rbind(includeDecision, excludeDecision))
+fisher.test(playDecide)
+```
+
+"advanced thinking" 
+```{r}
+olderAdv<- c(12,22)
+youngerAdv<-c(1,34)
+ageAdv<- as.matrix(rbind(olderAdv, youngerAdv))
+fisher.test(ageAdv)
+```
+```{r}
+includeAdv<- c(12,37)
+excludeAdv<-c(1,19)
+playAdv<- as.matrix(rbind(includeAdv, excludeAdv))
+fisher.test(playAdv)
+```
+##Approach/Avoid Explanation Exploration
+
+```{r}
+datAvoid<- read.csv("~/Desktop/PIE3P-AvoidExplanations.csv",na.strings="0")
+datAvoidFinal<- subset(datAvoid, datAvoid$FinalData=="Y")
+colnames(datAvoid)[1:4]<-c("subj", "FinalData", "ageGroup", "sex")
+datAvoidFinal$Age.Group<-as.factor(datAvoidFinal$Age.Group)
+datAvoidFinal$OlderYounger <- as.factor(ifelse(datAvoidFinal$Age.Group==3 | datAvoidFinal$Age.Group==4, "younger", "older"))
+```
+```{r}
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Pos.Char)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Pos.Char, datAvoidFinal$Age.Group)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Pos.Char, datAvoidFinal$OlderYounger)
+
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Neg.Char)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Neg.Char, datAvoidFinal$Age.Group)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Neg.Char, datAvoidFinal$OlderYounger)
+
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Pos.Feeling)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Pos.Feeling, datAvoidFinal$Age.Group)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Pos.Feeling, datAvoidFinal$OlderYounger)
+
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Neg.Feeling)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Neg.Feeling, datAvoidFinal$Age.Group)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Neg.Feeling, datAvoidFinal$OlderYounger)
+
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Inclusion)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Inclusion, datAvoidFinal$Age.Group)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Inclusion, datAvoidFinal$OlderYounger)
+
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Exclusion)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Exclusion, datAvoidFinal$Age.Group)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Exclusion, datAvoidFinal$OlderYounger)
+
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Comparison)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Comparison, datAvoidFinal$Age.Group)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Comparison, datAvoidFinal$OlderYounger)
+
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$MoralTerms)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$MoralTerms, datAvoidFinal$Age.Group)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$MoralTerms, datAvoidFinal$OlderYounger)
+
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$FutureTreatment)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$FutureTreatment, datAvoidFinal$Age.Group)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$FutureTreatment, datAvoidFinal$OlderYounger)
+
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Allow)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Allow, datAvoidFinal$Age.Group)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Allow, datAvoidFinal$OlderYounger)
+
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Other)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Other, datAvoidFinal$Age.Group)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$Other, datAvoidFinal$OlderYounger)
+
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$RestatePlayChoice)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$RestatePlayChoice, datAvoidFinal$Age.Group)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$RestatePlayChoice, datAvoidFinal$OlderYounger)
+
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$NoExplanation)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$NoExplanation, datAvoidFinal$Age.Group)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$NoExplanation, datAvoidFinal$OlderYounger)
+```
+
+"Creating Groups"
+```{r}
+datAvoidFinal$feelings<-NA
+for (i in 1:length(datAvoidFinal$Subject..)){
+datAvoidFinal$feelings[i]<- sum(datAvoidFinal$Pos.Feeling[i], datAvoidFinal$Neg.Feeling[i], na.rm=TRUE)
+}
+datAvoidFinal$characteristics<- NA
+for (i in 1:length(datAvoidFinal$Subject..)){
+datAvoidFinal$characteristics[i]<- sum(datAvoidFinal$Pos.Char[i],datAvoidFinal$Neg.Char[i], na.rm=TRUE)
+}
+datAvoidFinal$gamePlay<- NA
+for (i in 1:length(datAvoidFinal$Subject..)){
+datAvoidFinal$gamePlay[i]<- sum(datAvoidFinal$Inclusion[i],datAvoidFinal$Exclusion[i], na.rm=TRUE)
+}
+datAvoidFinal$abstractConcepts<-NA
+for (i in 1:length(datAvoidFinal$Subject..)){
+datAvoidFinal$abstractConcepts[i]<- sum(datAvoidFinal$MoralTerms[i],datAvoidFinal$FutureTreatment[i], datAvoidFinal$Allow[i], na.rm=TRUE)
+}
+
+datAvoidFinal$decisionMaking<- datAvoidFinal$Comparison
+```
+
+```{r}
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$characteristics)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$characteristics,datAvoidFinal$OlderYounger)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$characteristics, datAvoidFinal$Age.Group)
+
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$feelings)
+cro(datAvoidFinal$PlayChoice,datAvoidFinal$feelings,datAvoidFinal$OlderYounger)
+cro(datAvoidFinal$PlayChoice,datAvoidFinal$feelings, datAvoidFinal$Age.Group)
+
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$gamePlay)
+cro(datAvoidFinal$PlayChoice,datAvoidFinal$gamePlay, datAvoidFinal$OlderYounger)
+cro(datAvoidFinal$PlayChoice,datAvoidFinal$gamePlay, datAvoidFinal$Age.Group)
+
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$abstractConcepts)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$abstractConcepts, datAvoidFinal$OlderYounger)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$abstractConcepts, datAvoidFinal$Age.Group)
+
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$decisionMaking)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$decisionMaking, datAvoidFinal$OlderYounger)
+cro(datAvoidFinal$PlayChoice, datAvoidFinal$decisionMaking, datAvoidFinal$Age.Group)
+```
+
+###Exploratory Fisher's on Categories
+"Characteristics" 
+```{r}
+AolderChar<- c(9,25)
+AyoungerChar<- c(4,31)
+AageChar<- as.matrix(rbind(AolderChar, AyoungerChar))
+fisher.test(AageChar)
+```
+```{r}
+AincluderChar<- c(11,38)
+AexcluderChar<- c(2,18)
+AplayChar<- as.matrix(rbind(AincluderChar, AexcluderChar))
+fisher.test(AplayChar)
+```
+
+"feelings" 
+```{r}
+AolderFeel<- c(1, 33)
+AyoungerFeel<-c(3,32)
+AageFeel<- as.matrix(rbind(AolderFeel, AyoungerFeel))
+fisher.test(AageFeel)
+
+```
+```{r}
+AincluderFeel<- c(2, 47)
+AexcluderFeel<-c(2,18)
+AplayFeel<- as.matrix(rbind(AincluderFeel, AexcluderFeel))
+fisher.test(AplayFeel)
+```
+
+
+"Game Play"
+```{r}
+AolderGame<-c(20,14)
+AyoungerGame<-c(14,21)
+AageGame<-as.matrix(rbind(AolderGame, AyoungerGame))
+fisher.test(AageGame)
+```
+
+```{r}
+AincluderGame<- c(28,21)
+AexcluderGame<- c(6,14)
+AplayGame<- as.matrix(rbind(AincluderGame, AexcluderGame))
+fisher.test(AplayGame)
+```
+
+"Decision Making"
+```{r}
+AolderDecision<- c(1,34)
+AyoungerDecision<- c(2,33)
+AageDecide<- as.matrix(rbind(AolderDecision, AyoungerDecision))
+fisher.test(AageDecide)
+```
+```{r}
+AincludeDecision<- c(2,47)
+AexcludeDecision<- c(1,19)
+AplayDecide<- as.matrix(rbind(AincludeDecision, AexcludeDecision))
+fisher.test(AplayDecide)
+```
+
+"advanced thinking" 
+```{r}
+AolderAdv<- c(10,24)
+AyoungerAdv<-c(7,28)
+AageAdv<- as.matrix(rbind(AolderAdv, AyoungerAdv))
+fisher.test(AageAdv)
+```
+```{r}
+AincludeAdv<- c(13,36)
+AexcludeAdv<-c(4,16)
+AplayAdv<- as.matrix(rbind(AincludeAdv, AexcludeAdv))
+fisher.test(AplayAdv)
+```
+
+###NewExploratory Analyses: 11/17
+- creating logistic regression to look at association between play choice, age, and category use
+```{r}
+ageMonths<-cbind.data.frame(dat$subj, dat$ageMonths)
+colnames(ageMonths)<- c("Subject..", "ageMonths")
+datPlayFinal$PlayChoiceNum<- as.factor(datPlayFinal$PlayChoice)
+levels(datPlayFinal$PlayChoiceNum)<-c(0,1)
+datPlayFinal$PlayChoiceNum<- as.numeric(levels(datPlayFinal$PlayChoiceNum))[datPlayFinal$PlayChoiceNum]
+dp<-right_join(datPlayFinal, ageMonths)
+```
+
+"abstract thinking"
+```{r}
+dp$abstractConcepts<- as.factor(dp$abstractConcepts)
+levels(dp$abstractConcepts)<- c(0,1,1)
+dp$abstractConcepts<- as.numeric(levels(dp$abstractConcepts))[dp$abstractConcepts]
+summary(glm(PlayChoiceNum~ageMonths + abstractConcepts, data=dp, family="binomial"))
+summary(glm(PlayChoiceNum~abstractConcepts, data=dp, family="binomial"))
+```
+
+"decision making"
+```{r}
+dp$decisionMaking<- as.factor(dp$decisionMaking)
+dp$decisionMaking<-ifelse(is.na(dp$decisionMaking)== TRUE, 0, dp$decisionMaking)
+summary(as.factor(dp$decisionMaking))
+summary(glm(PlayChoiceNum~ decisionMaking+ ageMonths, data=dp, family="binomial"))
+summary(glm(PlayChoiceNum~decisionMaking, data=dp, family="binomial"))
+```
+
+"characteristics"
+```{r}
+dp$characteristics<- as.factor(dp$characteristics)
+levels(dp$characteristics)<- c(0,1,1)
+dp$characteristics<- as.numeric(levels(dp$characteristics))[dp$characteristics]
+summary(glm(PlayChoiceNum~characteristics+ageMonths, data=dp, family="binomial"))
+summary(glm(PlayChoiceNum~characteristics, data=dp, family="binomial"))
+```
+
+"feelings"
+```{r}
+summary(as.factor(dp$feelings))
+summary(glm(PlayChoiceNum~feelings+ageMonths, data=dp, family="binomial"))
+summary(glm(PlayChoiceNum~feelings, data=dp, family="binomial"))
+```
+

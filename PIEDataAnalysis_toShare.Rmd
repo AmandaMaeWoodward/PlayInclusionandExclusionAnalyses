@@ -1,0 +1,766 @@
+---
+title: "PIEDataAnalysis_toShare"
+author: "Amanda Mae Woodward"
+date: "1/28/2021"
+output: html_document
+---
+
+```{r loadingLibraries}
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+library(tidyverse)
+library(lme4)
+library(doBy)
+library(car)
+```
+
+```{r loadingData}
+"note: there are problems with the clean data sheets- should use the main coding"
+PIE1.4<-read.csv("~/Desktop/PIE analyses/PIE1.4MainAnalysis.csv")
+PIE2.4<-read.csv("~/Desktop/PIE analyses/PIE2.4MainAnalysis.csv")
+PIE2.5<-read.csv("~/Desktop/PIE analyses/PIE2.5MainAnalysis.csv")
+
+PIE2.6Main<-read.csv("~/Desktop/PIE analyses/PIE2-6MainCoding.csv")
+PIE2.6Subj<-subjinfo<- read.csv("~/Desktop/PIE analyses/PIE2-6_subjcoding.csv")
+
+subjinfo<-PIE2.6Subj[,1:12]
+colnames(subjinfo)<- c("subj", "id", "sex","dob","dot", "age", "randomization", "ecolor", "eside", "order", "qOrder","finalData")
+colnames(PIE2.6Main)<-c("subj", "id", "a1Type", "a1Resp", "q1Type", "q1Resp","q1Exp", "a2Type", "a2Resp", "q2Type", "q2Resp", "q2Exp", "a3Type","a3Resp", "q3Type", "q3Resp", "q3Exp", "PlayQ","MemCheck","overall")
+PIE2.6<-left_join(subjinfo,PIE2.6Main[,1:19])
+PIE2.6<-subset(PIE2.6,PIE2.6$finalData=="Yes")
+```
+
+```{r cleaningPIE14}
+for (i in (1:length(colnames(PIE1.4)))){
+  PIE1.4[,i]<- as.factor(PIE1.4[,i])
+}
+
+PIE1.4$dob2<- as.character(PIE1.4$dob)
+PIE1.4$dob<- as.Date(PIE1.4$dob2, format= "%m/%d/%y")
+PIE1.4$dot<-as.character(PIE1.4$dot)
+PIE1.4$dot<-as.Date(PIE1.4$dot,format= "%m/%d/%y")
+PIE1.4$ageDays<-PIE1.4$dot-PIE1.4$dob
+PIE1.4$ageMonths<- (PIE1.4$dot-PIE1.4$dob)/30.5
+PIE1.4$ageMonths<-as.numeric(PIE1.4$ageMonths)
+```
+
+```{r cleaningPIE24}
+for(i in(1:length(colnames(PIE2.4)))){
+  PIE2.4[,i]<-as.factor(PIE2.4[,i])
+}
+PIE2.4$dob2<- as.character(PIE2.4$dob)
+PIE2.4$dob<- as.Date(PIE2.4$dob2, format= "%m/%d/%y")
+PIE2.4$dot<-as.character(PIE2.4$dot)
+PIE2.4$dot<-as.Date(PIE2.4$dot,format= "%m/%d/%y")
+PIE2.4$ageDays<-PIE2.4$dot-PIE2.4$dob
+PIE2.4$ageMonths<- (PIE2.4$dot-PIE2.4$dob)/30.5
+```
+```{r cleaningPIE25}
+for(i in (1:length(colnames(PIE2.5)))){
+  PIE2.5[,i]<- as.factor(PIE2.5[,i])
+}
+PIE2.5$dob2<- as.character(PIE2.5$dob)
+PIE2.5$dob<- as.Date(PIE2.5$dob2, format= "%m/%d/%y")
+PIE2.5$dot<-as.character(PIE2.5$dot)
+PIE2.5$dot<-as.Date(PIE2.5$dot,format= "%m/%d/%y")
+PIE2.5$ageDays<-PIE2.5$dot-PIE2.5$dob
+PIE2.5$ageMonths<- (PIE2.5$dot-PIE2.5$dob)/30.5
+```
+
+```{r cleaningPIE26}
+colnames(PIE2.6)
+for(i in (1:length(colnames(PIE2.6)))){
+  PIE2.6[,i]<- as.factor(PIE2.6[,i])
+}
+PIE2.6$dob2<- as.character(PIE2.6$dob)
+PIE2.6$dob<- as.Date(PIE2.6$dob2, format= "%m/%d/%y")
+PIE2.6$dot<-as.character(PIE2.6$dot)
+PIE2.6$dot<-as.Date(PIE2.6$dot,format= "%m/%d/%y")
+PIE2.6$ageDays<-PIE2.6$dot-PIE2.6$dob
+PIE2.6$ageMonths<- (PIE2.6$dot-PIE2.6$dob)/30.5
+
+colnames(PIE2.6)<- c("subj", "id", "sex", "dob", "dot", "age", "randomization", "ewho","eside", "order", "qOrder", "finalData", "allocationtype", "allocatedto", "questiontype", "questionresponse","justification","allocationtype2", "allocatedto2","questiontype2", "questionresponse2", "justication2", "allocationtype3","allocatedto3", "questiontype3", "questionresponse3", "justification3", "questionresponse4", "questionresponse5", "dob2", "ageDays", "ageMonths" )
+```
+
+```{r PIE14namingexcluder} 
+
+PIE1.4e0<- subset(PIE1.4,PIE1.4$ewho=="o")
+levels(PIE1.4e0$allocatedto)<- c("excluder", "includer")
+levels(PIE1.4e0$allocatedto2)<- c("excluder", "includer")
+levels(PIE1.4e0$allocatedto3)<- c("excluder", "includer")
+levels(PIE1.4e0$questionresponse)<- c(NA,"excluder", "includer")
+levels(PIE1.4e0$questionresponse2)<- c(NA,"excluder", "includer")
+levels(PIE1.4e0$questionresponse3)<- c(NA,"excluder", "includer")
+levels(PIE1.4e0$questionresponse4)<- c("excluder", "includer")
+
+PIE1.4e1<- subset(PIE1.4, PIE1.4$ewho=="y")
+levels(PIE1.4e1$allocatedto)<- c("includer", "excluder")
+levels(PIE1.4e1$allocatedto2)<- c("includer", "excluder")
+levels(PIE1.4e1$allocatedto3)<- c("includer", "excluder")
+levels(PIE1.4e1$questionresponse)<- c(NA, "includer", "excluder")
+levels(PIE1.4e1$questionresponse2)<- c(NA,"includer", "excluder")
+levels(PIE1.4e1$questionresponse3)<- c(NA,"includer", "excluder")
+levels(PIE1.4e1$questionresponse4)<- c("includer", "excluder")
+
+PIE1.4F<- rbind.data.frame(PIE1.4e0, PIE1.4e1)  
+```
+
+```{r PIE24namingExcluders}
+PIE2.4e0<- subset(PIE2.4, PIE2.4$ewho=="b")
+levels(PIE2.4e0$allocatedto)<- c("excluder", "includer")
+levels(PIE2.4e0$allocatedto2)<- c("excluder", "includer")
+levels(PIE2.4e0$allocatedto3)<- c("excluder", "includer")
+levels(PIE2.4e0$questionresponse)<- c("excluder", "includer")
+levels(PIE2.4e0$questionresponse2)<- c("excluder", "includer")
+levels(PIE2.4e0$questionresponse3)<- c("excluder", "includer")
+levels(PIE2.4e0$questionresponse4)<- c("excluder", "includer")
+levels(PIE2.4e0$questionresponse5)<- c(NA,"excluder", "includer")
+PIE2.4e1<- subset(PIE2.4, PIE2.4$ewho=="g")
+levels(PIE2.4e1$allocatedto)<- c("includer", "excluder")
+levels(PIE2.4e1$allocatedto2)<- c("includer", "excluder")
+levels(PIE2.4e1$allocatedto3)<- c("includer", "excluder")
+levels(PIE2.4e1$questionresponse)<- c("includer", "excluder")
+levels(PIE2.4e1$questionresponse2)<- c("includer", "excluder")
+levels(PIE2.4e1$questionresponse3)<- c("includer", "excluder")
+levels(PIE2.4e1$questionresponse4)<- c("includer", "excluder")
+levels(PIE2.4e1$questionresponse5)<- c(NA,"includer", "excluder")
+PIE2.4F<- rbind.data.frame(PIE2.4e0,PIE2.4e1)
+```
+
+```{r PIE25namingExcluders}
+PIE2.5e0<- subset(PIE2.5, PIE2.5$ewho=="b")
+levels(PIE2.5e0$allocatedto)<- c("excluder", "includer")
+levels(PIE2.5e0$allocatedto2)<- c("excluder", "includer")
+levels(PIE2.5e0$allocatedto3)<- c("excluder", "includer")
+levels(PIE2.5e0$questionresponse)<- c("excluder", "includer")
+levels(PIE2.5e0$questionresponse2)<- c("excluder", "includer")
+levels(PIE2.5e0$questionresponse3)<- c("excluder", "includer")
+levels(PIE2.5e0$questionresponse4)<- c("excluder", "includer")
+levels(PIE2.5e0$questionresponse5)<- c("excluder", "includer")
+PIE2.5e1<- subset(PIE2.5, PIE2.5$ewho=="g")
+levels(PIE2.5e1$allocatedto)<- c("includer", "excluder")
+levels(PIE2.5e1$allocatedto2)<- c("includer", "excluder")
+levels(PIE2.5e1$allocatedto3)<- c("includer", "excluder")
+levels(PIE2.5e1$questionresponse)<- c("includer", "excluder")
+levels(PIE2.5e1$questionresponse2)<- c("includer", "excluder")
+levels(PIE2.5e1$questionresponse3)<- c("includer", "excluder")
+levels(PIE2.5e1$questionresponse4)<- c("includer", "excluder")
+levels(PIE2.5e1$questionresponse5)<- c("includer", "excluder")
+PIE2.5F<- rbind.data.frame(PIE2.5e0,PIE2.5e1)
+```
+
+```{r PIE26namingExcluders}
+PIE2.6e0<- subset(PIE2.6, PIE2.6$ewho=="Blue")
+levels(PIE2.6e0$allocatedto)<- c("excluder", "includer")
+levels(PIE2.6e0$allocatedto2)<- c("excluder", "includer")
+levels(PIE2.6e0$allocatedto3)<- c("excluder", "includer")
+levels(PIE2.6e0$questionresponse)<- c("excluder", "includer")
+levels(PIE2.6e0$questionresponse2)<- c("excluder", "includer")
+levels(PIE2.6e0$questionresponse3)<- c("excluder", "includer")
+levels(PIE2.6e0$questionresponse4)<- c("excluder", "includer")
+levels(PIE2.6e0$questionresponse5)<- c("excluder", "includer")
+PIE2.6e1<- subset(PIE2.6, PIE2.6$ewho=="Green")
+levels(PIE2.6e1$allocatedto)<- c("includer", "excluder")
+levels(PIE2.6e1$allocatedto2)<- c("includer", "excluder")
+levels(PIE2.6e1$allocatedto3)<- c("includer", "excluder")
+levels(PIE2.6e1$questionresponse)<- c("includer", "excluder")
+levels(PIE2.6e1$questionresponse2)<- c("includer", "excluder")
+levels(PIE2.6e1$questionresponse3)<- c("includer", "excluder")
+levels(PIE2.6e1$questionresponse4)<- c("includer", "excluder")
+levels(PIE2.6e1$questionresponse5)<- c("includer", "excluder")
+PIE2.6F<- rbind.data.frame(PIE2.6e0,PIE2.6e1)
+```
+
+```{r allocationSums}
+PIE1.4F$allocationSum<- rep(NA, nrow(PIE1.4F))
+for (i in 1:nrow(PIE1.4F)){
+  PIE1.4F$allocationSum[i]<-sum(PIE1.4F$allocatedto[i]=="includer", PIE1.4F$allocatedto2[i]=="includer", PIE1.4F$allocatedto3[i]=="includer")
+}
+
+PIE2.4F$allocationSum<- rep(NA, nrow(PIE2.4F))
+for (i in 1:nrow(PIE2.4F)){
+  PIE2.4F$allocationSum[i]<-sum(PIE2.4F$allocatedto[i]=="includer", PIE2.4F$allocatedto2[i]=="includer", PIE2.4F$allocatedto3[i]=="includer")
+}
+
+PIE2.5F$allocationSum<- rep(NA, nrow(PIE2.5F))
+for (i in 1:nrow(PIE2.5F)){
+  PIE2.5F$allocationSum[i]<-sum(PIE2.5F$allocatedto[i]=="includer", PIE2.5F$allocatedto2[i]=="includer", PIE2.5F$allocatedto3[i]=="includer")
+}
+
+PIE2.6F$allocationSum<- rep(NA, nrow(PIE2.6F))
+for (i in 1:nrow(PIE2.6F)){
+  PIE2.6F$allocationSum[i]<-sum(PIE2.6F$allocatedto[i]=="includer", PIE2.6F$allocatedto2[i]=="includer", PIE2.6F$allocatedto3[i]=="includer")
+}
+```
+# PIE1.4 Data Analyses
+###Question: Do children prefer includers over excluders (as evidenced by resource allocations)?
+####Preliminary Analyses
+```{r 1.4AllocationPrelim}
+aSum1.4<- lm(allocationSum~ewho+eside+order+sex+ageMonths, data=PIE1.4F)
+summary(aSum1.4)
+```
+**Interpretation:** No counterbalancing factors influence children's allocation choices. 
+
+####Analysis
+```{r 1.4Allocation}
+t.test(PIE1.4F$allocationSum,mu=1.5)
+p.adjust(1, n = 5, method="bonferroni")
+```
+
+###Do children's first allocation choices indicate a preference for either character? 
+####Preliminary 
+```{r 1.4firstAllocation, include=FALSE}
+PIE1.4F$allocatedFirst<-PIE1.4F$allocatedto
+levels(PIE1.4F$allocatedFirst)<- c(0,1)
+PIE1.4F$allocatedFirst<- as.numeric(levels(PIE1.4F$allocatedFirst))[PIE1.4F$allocatedFirst]
+```
+```{r 1.4firstAllocationPrelim}
+aFirst1.4<- glm(allocatedFirst~ewho+eside+order+sex, data=PIE1.4F, family="binomial")
+summary(aFirst1.4)
+```
+**Interpretation:** No counterbalancing factors predicted children's first allocation choice. 
+
+####Analysis
+```{r 1.4FirstAllocation}
+summary(as.factor(PIE1.4F$allocatedFirst))
+binom.test(12,32)
+```
+**Interpretation:** Children did not allocate the first item to either character more often than chance (12 of 32, p = 0.21)
+
+###Question: Do children indicate the excluder is meaner than the includer more often than chance?"
+
+**preliminary analysis**
+
+```{r 1.4meanPrelim}
+Mean1.4<- glm(questionresponse~ewho+eside+order+sex, data=PIE1.4F, family="binomial")
+summary(Mean1.4)
+```
+**Interpretation:** Counterbalance factors did not predict who children identified as meaner
+
+**analysis**
+
+```{r 1.4Mean}
+summary(PIE1.4F$questionresponse)
+binom.test(18,31)
+```
+**Interpretation:** Children do not indicate the excluder is the meaner character more often than chance (18 of 31, p = 0.47)
+
+###Question: Do children indicate that the includer is a better sharer than the excluder more often than chance?
+
+**preliminary analysis**
+
+```{r 1.4SharesetupPrelim, include=FALSE}
+levels(PIE1.4F$questionresponse2)<- c(0,1)
+PIE1.4F$questionresponse2<- as.numeric(levels(PIE1.4F$questionresponse2))[PIE1.4F$questionresponse2]
+```
+```{r 1.4SharePrelim}
+Share1.4<- glm(questionresponse2~ewho + eside+order+sex, data=PIE1.4F, family="binomial")
+summary(Share1.4)
+```
+**Interpretation** counterbalance factors do not predict whether children will indicate the includer is a better sharer.
+
+**analysis**
+
+```{r 1.4Sharer}
+summary(as.factor(PIE1.4F$questionresponse2))
+binom.test(19,31)
+```
+**Interpretation:** Children do not indicate the includer is the better sharing character more often than chance (19 of 31, p = .28)
+
+###Question: Do children indicate the includer has more friends than the excluder more often than chance?
+
+**preliminary analysis**
+
+```{r 1.4FriendsPrelimsetup, include=FALSE}
+levels(PIE1.4F$questionresponse3)<- c(0,1)
+PIE1.4F$questionresponse3<- as.numeric(levels(PIE1.4F$questionresponse3))[PIE1.4F$questionresponse3]
+```
+```{r 1.4FriendsPrelim}
+Friends1.4<- glm(questionresponse3~ewho +eside+order+sex, data=PIE1.4F)
+summary(Friends1.4)
+```
+**Interpretation:** Counterbalancing factorsdid not predict children's choice of who has more friends
+
+**analysis**
+
+```{r 1.4Friends}
+summary(as.factor(PIE1.4F$questionresponse3))
+binom.test(19,31)
+```
+**Interpretation:** Children do not indicate the includer has more friends more often than chance (19 of 31, p =.28)
+
+###Question: Do children indicate that Horsey should play with the includer more often than chance?
+
+**preliminary analysis**
+
+```{r 1.4HorsePrelimsetup, include=FALSE}
+levels(PIE1.4F$questionresponse4)<- c(0,1)
+PIE1.4F$questionresponse4<- as.numeric(levels(PIE1.4F$questionresponse4))[PIE1.4F$questionresponse4]
+```
+```{r 1.4HorsePrelim}
+ThirdParty1.4<- glm(questionresponse4~ewho+eside+order+sex, data=PIE1.4F)
+summary(ThirdParty1.4)
+
+```
+**Interpretation:** Counterbalancing factors are not significant predictors of children's third-party suggestions
+
+**analysis**
+
+```{r 1.4Horse}
+summary(as.factor(PIE1.4F$questionresponse4))
+binom.test(18,32)
+```
+**Interpretation:** Children do not indicate that horsey should play with the includers more than chance (18 of 32, p=.59)
+
+##PIE1.4 Exploratory Analysis- Sharer as a (rough) manipulation check
+```{r 1.4SharerSubset, include=FALSE}
+PIE1.4Share<- subset(PIE1.4F, PIE1.4F$questionresponse2==1)
+```
+###Question: Do children prefer includers over excluders (as evidenced by resource allocations)?
+
+**preliminary analysis**
+
+```{r 1.4Share-AllocationPrelim}
+ExaSum1.4<- lm(allocationSum~ewho+eside+order+sex, data=PIE1.4Share)
+summary(ExaSum1.4)
+```
+**Interpretation:** Children allocate more items to the yellow puppets and to the puppets on the right. The intercept is also significant.  
+
+**analysis**
+
+```{r 1.4Share-Allocation}
+t.test(PIE1.4Share$allocationSum, mu=1.5)
+```
+Interpretation: There is no significant difference between the number of items children allocate to the includer (t=.96, df=18, p = .35)
+
+###Question: Do children's first resource allocations indicate a preference for one character over another?
+
+**preliminary setup**
+
+```{r 1.4ShareFirstAllocation-Prelimsetup, include=FALSE}
+PIE1.4Share$allocatedFirst<-PIE1.4Share$allocatedto
+levels(PIE1.4Share$allocatedFirst)<- c(0,1)
+PIE1.4Share$allocatedFirst<- as.numeric(levels(PIE1.4Share$allocatedFirst))[PIE1.4Share$allocatedFirst]
+```
+```{r 1.4ShareFirstAllocation-Prelim}
+ExaFirst1.4<- glm(allocatedFirst~ewho+eside+order+sex, data=PIE1.4Share)
+summary(ExaFirst1.4)
+```
+**Interpretation:** The counterbalancing factors did not predict children's first allocation choice. 
+
+**analysis**
+```{r 1.4ShareFirstAllocation}
+summary(as.factor(PIE1.4Share$allocatedFirst))
+binom.test(8,19)
+```
+**Interpretation:** children do not prefer the includer in their first allocation choices (8 of 19, p = .65)
+
+###Question: Do children indicate the excluder is meaner than the includer more often than chance?
+
+**preliminary analysis**
+
+```{r 1.4ShareMean-Prelim}
+ExMean1.4<-glm(questionresponse2~eside+ewho+order+sex, data=PIE1.4Share, family="binomial")
+summary(ExMean1.4)
+```
+**Interpretation:** Counterbalancing factors do not predict children's choices of who is meaner.
+
+**analysis**
+
+```{r 1.4ShareMean}
+summary(PIE1.4Share$questionresponse)
+binom.test(18,19)
+```
+**Interpretation:** Children identified the excluder as the meaner character more often than chance (18 of 19, p<0.001)
+
+###Question: Do children indicate the includer has more friends than the excluder more often than chance?"
+
+**preliminary analysis**
+
+```{r 1.4ShareFriends-Prelim}
+ExFriends1.4<- lm(questionresponse3~ewho+eside+order+sex,data=PIE1.4Share)
+summary(ExFriends1.4)
+```
+**Interpretation:** Counterbalancing factors do not predict children's choice of who has more friends.
+
+**analysis**
+
+```{r 1.4ShareFriends}
+summary(as.factor(PIE1.4Share$questionresponse3))
+binom.test(11,19)
+```
+**Interpretation:** Children do not indicate the includer has more friends more often than chance (11 of 19, p = .64)
+
+###Question: Do children indicate that Horsey should play with the includer more often than chance?
+
+**preliminary analysis**
+
+```{r 1.4ShareHorse-Prelim}
+ExThirdParty1.4<- lm(questionresponse4~ewho +eside+ order+ sex, data=PIE1.4Share)
+summary(ExThirdParty1.4)
+```
+**Interpretation:** Counterbalancing factors do not predict children's play partner choice. the intercept is significant.
+
+**analysis**
+
+```{r 1.4ShareHorse}
+summary(as.factor(PIE1.4Share$questionresponse4))
+binom.test(14,19)
+```
+**Interpretation:** Children do not suggest Horsey play with the includer over the excluder (14 of 19, p = 0.06). 
+
+#PIE 2- All participants (Supplemental Material)
+Note: for PIE 2, the questions were not asked in a fixed order. In order to run analyses, I need to clean the data and create columns for the separate mean, nice, and sharer questions. 
+```{r}
+PIE2.4F$Mean<- NA
+PIE2.4F$Nice<- NA
+PIE2.4F$Share<-NA
+
+for (j in seq(60,70, 5)){
+  for (i in 1:nrow(PIE2.4F)){
+    if(PIE2.4F[i,j]=="m"){
+      PIE2.4F$Mean[i]<- levels(PIE2.4F[,(j+1)])[PIE2.4F[i,(j+1)]]}
+    if(PIE2.4F[i,j]=="n"){
+      PIE2.4F$Nice[i]<-levels(PIE2.4F[,(j+1)])[PIE2.4F[i,(j+1)]]}
+    if(PIE2.4F[i,j]=="s"){
+      PIE2.4F$Share[i]<-levels(PIE2.4F[,(j+1)])[PIE2.4F[i,(j+1)]]}
+  }
+}  
+PIE2.4F$horse<- PIE2.4F$questionresponse4
+PIE2.4F$mem<- PIE2.4F$questionresponse5
+```
+```{r}
+PIE2.5F$Mean<- NA
+PIE2.5F$Nice<- NA
+PIE2.5F$Share<-NA
+for (j in seq(63,73, 5)){
+  for (i in 1:nrow(PIE2.5F)){
+    if(PIE2.5F[i,j]=="m"){
+      PIE2.5F$Mean[i]<- levels(PIE2.5F[,(j+1)])[PIE2.5F[i,(j+1)]]}
+    if(PIE2.5F[i,j]=="n"){
+      PIE2.5F$Nice[i]<-levels(PIE2.5F[,(j+1)])[PIE2.5F[i,(j+1)]]}
+    if(PIE2.5F[i,j]=="s"){
+      PIE2.5F$Share[i]<-levels(PIE2.5F[,(j+1)])[PIE2.5F[i,(j+1)]]}
+  }
+}
+PIE2.5F$horse<- PIE2.5F$questionresponse4
+PIE2.5F$mem<- PIE2.5F$questionresponse5
+
+```
+
+```{r}
+PIE2.6F$Mean<- NA
+PIE2.6F$Nice<- NA
+PIE2.6F$Share<-NA
+for (j in seq(15,25, 5)){
+  for (i in 1:nrow(PIE2.6F)){
+    if(PIE2.6F[i,j]=="meaner"){
+      PIE2.6F$Mean[i]<- levels(PIE2.6F[,(j+1)])[PIE2.6F[i,(j+1)]]}
+    if(PIE2.6F[i,j]=="nicer"){
+      PIE2.6F$Nice[i]<-levels(PIE2.6F[,(j+1)])[PIE2.6F[i,(j+1)]]}
+    if(PIE2.6F[i,j]=="sharer"){
+      PIE2.6F$Share[i]<-levels(PIE2.6F[,(j+1)])[PIE2.6F[i,(j+1)]]}
+  }
+}
+PIE2.6F$horse<- PIE2.6F$questionresponse4
+PIE2.6F$mem<- PIE2.6F$questionresponse5
+```
+```{r combinev2}
+PIE2.4F$study<-4
+PIE2.5F$study<-5
+PIE2.6F$study<-6
+Fours<- cbind.data.frame(PIE2.4F[,1:7],PIE2.4F[,51], PIE2.4F[,86:93])
+colnames(Fours)[8]<-"firstAllocation"
+Fives<- cbind.data.frame(PIE2.5F[,1:7], PIE2.5F[,52], PIE2.5F[,91:98])
+colnames(Fives)[8]<-"firstAllocation"
+Sixes<- cbind.data.frame(PIE2.6F[,2],PIE2.6F[,1],PIE2.6F[,3:4], PIE2.6F[,8:10], PIE2.6F[,14], PIE2.6F[,32:39])
+colnames(Sixes)<-c("id", "subj", "sex", "dob","ewho","eside","order","firstAllocation", "ageMonths", "allocationSum", "Mean", "Nice", "Share", "horse","mem", "study")
+PIEv2<- rbind.data.frame(Fours,Fives,Sixes)
+levels(PIEv2$sex)<- c("f", "m", "f", "m")
+levels(PIEv2$eside)<-c("l", "r", "l", "r")
+```
+### Question: Do children allocate more resources to the includer or excluder? 
+
+**preliminary analyses**
+```{r}
+aSumAll<-lm(allocationSum~ewho+eside+order+sex +ageMonths, data=PIEv2)
+summary(aSumAll)
+```
+**Interpretation:** No counterbalancing factors influenced children's allocation choices
+
+**analyses**
+```{r}
+t.test(PIEv2$allocationSum, mu=1.5)
+```
+**Interpretation:** Children did not allocate items differently between includers and excluders
+
+###Question: Do children's first resource allocations indicate a preference for one character over another?
+
+**preliminary setup**
+
+```{r 1.4ShareFirstAllocation-Prelimsetup, include=FALSE}
+levels(PIEv2$firstAllocation)<- c(0,1)
+PIEv2$firstAllocation <- as.numeric(levels(PIEv2$firstAllocation))[PIEv2$firstAllocation]
+```
+```{r 1.4ShareFirstAllocation-Prelim}
+a1v2<- glm(firstAllocation~ewho+eside+order+sex, data=PIEv2, family="binomial")
+summary(a1v2)
+```
+**Interpretation:** No counterbalancing factors influenced children's allocation choices
+
+**analysis**
+```{r}
+summary(as.factor(PIEv2$firstAllocation))
+binom.test(39, 96)
+```
+**Interpretation:** Children's first allocation choices did not favor either character. 
+
+###Question: Do children's combined mean/nice responses indicate the includer is more positive?
+```{r}
+PIEv2$Mean<-as.factor(PIEv2$Mean)
+levels(PIEv2$Mean)<- c(1,0)
+PIEv2$Mean<-as.numeric(levels(PIEv2$Mean))[PIEv2$Mean]
+PIEv2$Nice<-as.factor(PIEv2$Nice)
+levels(PIEv2$Nice)<- c(0,1)
+PIEv2$Nice<-as.numeric(levels(PIEv2$Nice))[PIEv2$Nice]
+PIEv2$Pos<- PIEv2$Mean + PIEv2$Nice
+```
+
+**preliminary analyses**
+```{r}
+v2lmPos<- lm(Pos~ ewho+eside+order +sex + ageMonths, data=PIEv2)
+summary(v2lmPos)
+```
+**Interpretation:** Males were less likely to view includers more positively than excluders 
+
+**analysis**
+```{r}
+t.test(PIEv2$Pos, mu=1)
+```
+**Interpretation:** Children did not rate exluders differently than includers
+
+###Question: Do children indicate the excluder is meaner than the includer more often than chance?
+
+**preliminary analysis**
+
+```{r CombMeanerPrelim}
+v2Mean<-glm(Mean~ewho+eside+order+sex+ ageMonths,data=PIEv2, family="binomial")
+summary(v2Mean)
+```
+**Interpretation:** Males were less likely to view excluders as meaner than females
+
+**analysis**
+```{r CombMeaner}
+summary(as.factor(PIEv2$Mean))
+binom.test(54,96)
+```
+**Interpretation:** Children do not state that the excluder is meaner than the includer more often than chance (54 of 96, p =0.26). 
+
+###Question: Do children indicate the includer is nicer than the excluder more often than chance?
+
+**preliminary analysis**
+
+```{r CombMeanerPrelim}
+v2Nice<-glm(Nice~ewho+eside+order+sex+ ageMonths,data=PIEv2, family="binomial")
+summary(v2Nice)
+```
+**Interpretation:** None of the counterbalancing factors significantly predicted children's choice of which puppet was nicer
+
+**analysis**
+```{r CombMeaner}
+summary(as.factor(PIEv2$Nice))
+binom.test(50,96)
+```
+**Interpretation:** Children do not state that the includer is nicer than the excluder more often than chance (50 of 96, p =0.76). 
+
+###Question: Do children indicate that the includer is a better sharer than the excluder more often than chance?"
+
+**preliminary analysis**
+```{r include=FALSE}
+PIEv2$Share<- as.factor(PIEv2$Share)
+levels(PIEv2$Share)<-c(0,1) 
+PIEv2$Share<-as.numeric(levels(PIEv2$Share))[PIEv2$Share]
+```
+```{r CombsharerPrelim}
+v2Share<-glm(Share~ewho+eside+order+sex +ageMonths,data=PIEv2, family="binomial")
+summary(v2Share)
+```
+**Interpretation:** None of the counterbalancing factors significantly predicted children's choice of which puppet was a better sharer
+
+**analysis**
+
+```{r CombShare}
+summary(as.factor(PIEv2$Share))
+binom.test(55,96)
+```
+**Interpretation:** Children do not think the includer is a better sharer  (55 of 96, p = .18). 
+
+###Question: Do children indicate that Horsey should play with the includer more often than chance?
+
+**preliminary analysis**
+```{r include=FALSE}
+PIEv2$horse<- as.factor(PIEv2$horse)
+levels(PIEv2$horse)<-c(0,1) 
+PIEv2$horse<-as.numeric(levels(PIEv2$horse))[PIEv2$horse]
+```
+```{r CombHorsePrelim}
+v2horse<-glm(horse~ewho+eside+order+sex +ageMonths,data=PIEv2, family="binomial")
+summary(v2horse)
+```
+**Interpretation:** None of the counterbalancing factors significantly predicted children's choice of which puppet was a better sharer
+
+**analysis**
+
+```{r CombHorse}
+summary(as.factor(PIEv2$horse))
+binom.test(58,96)
+```
+**Interpretation:** Children did not recommend that horsey play with the includer more than chance( 58 of 96, p =0.051) 
+
+### Question: Do children answer the memory check correctly (the includer played with them more?)
+
+**preliminary analysis**
+
+```{r, include=FALSE}
+summary(PIEv2$mem)
+PIEv2$mem<- as.factor(PIEv2$mem)
+levels(PIEv2$mem)<- c(0,1)
+PIEv2$mem<-as.numeric(levels(PIEv2$mem))[PIEv2$mem]
+```
+```{r}
+v2Mem<- glm(mem~ewho + eside+ order + sex + ageMonths, data=PIEv2, family="binomial")
+summary(v2Mem)
+```
+**Interpretation::** No counterbalancing factors predicted children's memory check responses
+
+**analysis**
+
+```{r}
+summary(as.factor(PIEv2$mem))
+binom.test(68, 96)
+```
+**Interpretation:** Children answered the memory check correctly more often than chance
+
+#PIE 2 Analyses: Memory Check Correct
+Subsequent analyses include only the participants who accurately answered the memory check question.
+
+```{r}
+PIEv2MemCorr<-subset(PIEv2, PIEv2$mem==1)
+```
+
+### Question: Do children allocate more resources to the includers? 
+
+**preliminary analyses**
+```{r}
+v2MCallocation<- lm(allocationSum~ewho+eside+ order + sex + ageMonths, data=PIEv2MemCorr)
+summary(v2MCallocation)
+```
+**Interpretation:** No counterbalancing factors predicted children's allocations
+
+**analyses**
+```{r}
+t.test(PIEv2MemCorr$allocationSum, mu=1.5)
+```
+**Interpretation:** Children did not favor either character with their allocation choices. 
+
+###Question: Do children's first resource allocations indicate a preference for one character over another?
+
+**preliminary analysis**
+
+```{r MemCombFirstAllocationPrelim}
+v2MCFirst<- lm(firstAllocation~ewho+eside+order+sex + ageMonths, data= PIEv2MemCorr)
+summary(v2MCFirst)
+```
+**Interpretation:** No counterbalancing factors significantly predicted children's first allocation choice.  
+
+**analysis**
+```{r MemCombFirstAllocation}
+summary(as.factor(PIEv2MemCorr$firstAllocation))
+binom.test(31,68)
+```
+**Interpretation:** Children did not favor either character with their first allocation. 
+
+###Do children attribute more positive characteristics to includers? 
+
+**preliminary analysis**
+```{r}
+v2MCPos<- lm(Pos~ewho+eside+order + sex+ ageMonths, data=PIEv2MemCorr)
+summary(v2MCPos)
+```
+**Interpretation:** No counterbalancing factors were significant predictors of children's responses
+
+**analysis**
+```{r}
+t.test(PIEv2MemCorr$Pos, mu=1)
+```
+**Interpretation:** Children significantly attributed more positive characteristics to includers than excluders 
+
+###Question: Do children indicate the excluder is meaner than the includer more often than chance?
+
+**preliminary analysis**
+
+```{r MemCombMeanerPrelim}
+v2MCMean<-glm(Mean~ewho+eside+order+sex + ageMonths,data=PIEv2MemCorr, family="binomial")
+summary(v2MCMean)
+```
+**Interpretation:** No counterbalancing factors significantly predicted children's choice of which puppet was meaner
+
+**analysis**
+
+```{r MemCombMeaner}
+summary(as.factor(PIEv2MemCorr$Mean))
+binom.test(46,68)
+```
+**Interpretation:** Children state that the excluder is meaner than the includer more often than chance (46 of 68, p <0.01). 
+
+###Question: Do children indicate the includer is nicer than the excluder more often than chance?
+
+**preliminary analysis**
+
+```{r MemCombNicerPrelim}
+v2MCNice<-glm(Nice~ewho+eside+order+sex + ageMonths,data=PIEv2MemCorr, family="binomial")
+summary(v2MCNice)
+```
+**Interpretation:** No counterbalancing factors significantly predicted children's choice of which puppet was nicer 
+
+**analysis**
+```{r MemCombNicer}
+summary(as.factor(PIEv2MemCorr$Nice))
+binom.test(44,68)
+```
+**Interpretation:** Children state that the includer is nicer than the includer more often than chance (46 of 68, p = 0.02).
+
+###Question: Do children indicate the includer is a better sharer than the excluder more often than chance?
+
+**preliminary analysis**
+
+```{r MemCombSharePrelim}
+v2MCShare<-glm(Share~ewho+eside+order+sex + ageMonths,data=PIEv2MemCorr, family="binomial")
+summary(v2MCShare)
+```
+**Interpretation:** No counterbalancing factors significantly predicted children's choice of which puppet was nicer 
+
+**analysis**
+```{r MemCombSharer}
+summary(as.factor(PIEv2MemCorr$Share))
+binom.test(46,68)
+```
+**Interpretation:** Children state that the includer is nicer than the includer more often than chance (46 of 68, p < 0.01).
+
+###Question: Do children indicate that Horsey should play with the includer more often than chance?
+
+**preliminary analysis**
+
+```{r MemCombSharePrelim}
+v2MChorse<-glm(horse~ewho+eside+order+sex + ageMonths,data=PIEv2MemCorr, family="binomial")
+summary(v2MChorse)
+```
+**Interpretation:** No counterbalancing factors significantly predicted children's choice of which puppet was nicer 
+
+**analysis**
+```{r MemCombSharer}
+summary(as.factor(PIEv2MemCorr$horse))
+binom.test(49,68)
+```
+**Interpretation:** Children recommend that the novel character should play with the includer more often than chance (46 of 68, p < 0.01).
